@@ -57,24 +57,32 @@ func ftoa(f float64) string {
 	return fmt.Sprintf("%.2f", f)
 }
 
-func percent(b, s float64) float64 {
-	return (s/b - 1) * 100
+func ftousd(f float64) string {
+	if f < 0 {
+		return "($" + ftoa(-f) + ")"
+	}
+	return "$" + ftoa(f)
+}
+
+func percent(buy, sell float64) float64 {
+	return (sell/buy - 1) * 100
 }
 
 func appendfile(d Data, file string) (Data, error) {
-	dp := make(Data)
+	// safe copy
+	dat := make(Data, len(d))
 	f, err := os.Open(file)
 	if err != nil {
 		return d, err
 	}
 	defer f.Close()
-	if err = json.NewDecoder(f).Decode(&dp); err != nil {
+	if err = json.NewDecoder(f).Decode(&dat); err != nil {
 		return d, err
 	}
-	for time, usd := range d {
-		dp[time] = usd
+	for _, snap := range d {
+		dat = append(dat, snap)
 	}
-	return dp, nil
+	return dat, nil
 }
 
 func savedata(d Data, file string) error {

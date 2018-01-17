@@ -25,14 +25,20 @@ var (
 	bitcome Bitcome
 )
 
-// Data maps points in time to dollar values.
-type Data map[time.Time]float64
+// Data is a list of prices at specific times.
+type Data []Snapshot
+
+// Snapshot is a price at specific time.
+type Snapshot struct {
+	USD  float64
+	Time time.Time
+}
 
 // Bitcome is the program's core structure.
 type Bitcome struct {
-	DataFile  string
-	Pool      float64
-	Threshold float64
+	DataFile string
+	Pool     float64
+	Percent  float64
 
 	once sync.Once
 	dat  Data
@@ -50,40 +56,54 @@ func (b *Bitcome) init() {
 
 	b.dat, err = appendfile(b.dat, b.DataFile)
 	warn(err)
+	println(b.dat)
 }
 
-// Run fires off the main program.
-func Run() error {
-	return bitcome.Run()
+// Passed checks current cost, returning whether
+// the set percentage has been reached.
+func Passed() (bool, error) {
+	return bitcome.Passed()
 }
 
-// Run fires off the main program.
-func (b *Bitcome) Run() error {
+// Passed checks current cost, returning whether
+// the set percentage has been reached.
+func (b *Bitcome) Passed() (bool, error) {
 	b.once.Do(b.init)
 
-	buy, err := buy()
-	if err != nil {
-		return warn(err)
+	// safe copy
+	dat := make(Data, len(b.dat))
+	for i, snap := range b.dat {
+		dat[i] = snap
 	}
-	println("LTC:buy   $" + ftoa(buy))
+
+	buynow, err := buy()
+	if err != nil {
+		return false, warn(err)
+	}
+	now := time.Now()
+	bought := buynow
+	if len(dat) > 0 {
+		bought = dat[len(dat)-1].USD
+	}
+	dat = append(dat, Snapshot{buynow, now})
+	println("LTC:buy   " + ftousd(bought))
 
 	sell, err := sell()
 	if err != nil {
-		return warn(err)
+		return false, warn(err)
 	}
-	println("LTC:sell  $" + ftoa(sell))
+	println("LTC:sell  " + ftousd(sell))
 
-	net := sell - buy
-	println("LTC:net   $" + ftoa(net))
+	fees := sell - buynow
+	println("LTC:fees  " + ftousd(fees))
 
-	pct := percent(buy, sell)
+	pct := percent(bought, sell)
 	println("LTC:pct   " + ftoa(pct) + "%")
 
-	// if pct > 10 {
-	// 	b.dat[time.Now()] = sell
-	// }
+	// safe mutation
+	b.dat = dat
 
-	return nil
+	return pct >= b.Percent, nil
 }
 
 // Save saves the program's collected data.
@@ -94,5 +114,6 @@ func Save() error {
 // Save saves the program's collected data.
 func (b *Bitcome) Save() error {
 	b.once.Do(b.init)
+	println(b.dat)
 	return savedata(b.dat, b.DataFile)
 }
