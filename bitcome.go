@@ -20,7 +20,7 @@ var (
 	// bought to sold needed for an alert.
 	//
 	// This takes fees into account.
-	Percent = 5.
+	Percent = 8.
 
 	bitcome Bitcome
 )
